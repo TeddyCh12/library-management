@@ -8,8 +8,20 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/components/books/book-cover";
+import { BorrowReturnPanel } from "@/components/books/borrow-return-panel";
 import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { LoanHistoryTable } from "@/components/books/loan-history-table";
+
+// Dev-only until auth: the seeded demo users power the acting-as picker.
+async function getDemoUsers() {
+  return prisma.user.findMany({
+    where: {
+      email: { in: ["demo.member@example.com", "demo.librarian@example.com"] },
+    },
+    select: { id: true, name: true, email: true },
+    orderBy: { email: "asc" },
+  });
+}
 
 // cache() dedupes the query between generateMetadata and the page render.
 const getBook = cache(async (id: string) => {
@@ -40,15 +52,13 @@ export default async function BookDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const book = await getBook(id);
+  const [book, demoUsers] = await Promise.all([getBook(id), getDemoUsers()]);
   if (!book) {
     notFound();
   }
 
-  const activeLoans = book.loans.filter(
-    (loan) => loan.status === "ACTIVE",
-  ).length;
-  const availableCopies = book.totalCopies - activeLoans;
+  const activeLoans = book.loans.filter((loan) => loan.status === "ACTIVE");
+  const availableCopies = book.totalCopies - activeLoans.length;
   const isAvailable = availableCopies > 0;
 
   return (
@@ -108,8 +118,18 @@ export default async function BookDetailPage({
             </p>
           )}
 
+          <BorrowReturnPanel
+            bookId={book.id}
+            availableCopies={availableCopies}
+            activeLoans={activeLoans.map((loan) => ({
+              id: loan.id,
+              userId: loan.userId,
+              dueAt: loan.dueAt,
+            }))}
+            users={demoUsers}
+          />
+
           <div className="mt-auto flex flex-wrap gap-2 pt-2">
-            {/* Borrow/Return buttons go here in step 5. */}
             <Button
               variant="outline"
               render={<Link href={`/books/${book.id}/edit`} />}

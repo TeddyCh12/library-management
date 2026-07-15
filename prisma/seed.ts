@@ -215,6 +215,19 @@ const books: SeedBook[] = [
   },
 ];
 
+const demoUsers = [
+  {
+    name: "Demo Member",
+    email: "demo.member@example.com",
+    role: "MEMBER",
+  },
+  {
+    name: "Demo Librarian",
+    email: "demo.librarian@example.com",
+    role: "LIBRARIAN",
+  },
+] as const;
+
 async function main() {
   for (const book of books) {
     await prisma.book.upsert({
@@ -227,6 +240,15 @@ async function main() {
     });
   }
   console.log(`Seeded ${books.length} books.`);
+
+  for (const user of demoUsers) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: user,
+    });
+  }
+  console.log(`Seeded ${demoUsers.length} demo users.`);
 }
 
 main()

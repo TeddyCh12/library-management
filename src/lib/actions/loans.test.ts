@@ -1,0 +1,170 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// In-memory stand-ins for the two tables the loan actions touch, so the
+// transaction logic can be tested without a database connection.
+const mocks = vi.hoisted(() => {
+  type BookRow = { id: string; totalCopies: number };
+  type LoanRow = {
+    id: string;
+    bookId: string;
+    userId: string;
+    status: "ACTIVE" | "RETURNED";
+    dueAt: Date;
+    returnedAt: Date | null;
+  };
+
+  const state = {
+    books: [] as BookRow[],
+    loans: [] as LoanRow[],
+  };
+
+  function matchesWhere(loan: LoanRow, where: Partial<LoanRow>) {
+    return Object.entries(where).every(
+      ([key, value]) => loan[key as keyof LoanRow] === value,
+    );
+  }
+
+  const tx = {
+    book: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        state.books.find((book) => book.id === where.id) ?? null,
+    },
+    loan: {
+      count: async ({ where }: { where: Partial<LoanRow> }) =>
+        state.loans.filter((loan) => matchesWhere(loan, where)).length,
+      create: async ({ data }: { data: Omit<LoanRow, "id" | "returnedAt"> }) => {
+        const loan: LoanRow = {
+          id: `loan-${state.loans.length + 1}`,
+          returnedAt: null,
+          ...data,
+        };
+        state.loans.push(loan);
+        return loan;
+      },
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        state.loans.find((loan) => loan.id === where.id) ?? null,
+      update: async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: Partial<LoanRow>;
+      }) => {
+        const loan = state.loans.find((row) => row.id === where.id);
+        if (!loan) {
+          throw new Error("Record not found");
+        }
+        Object.assign(loan, data);
+        return loan;
+      },
+    },
+  };
+
+  const prisma = {
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
+  };
+
+  return { state, prisma, revalidatePath: vi.fn() };
+});
+
+vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+
+import { borrowBook, returnBook } from "@/lib/actions/loans";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function addBook(id: string, totalCopies: number) {
+  mocks.state.books.push({ id, totalCopies });
+}
+
+function addActiveLoan(id: string, bookId: string, userId: string) {
+  mocks.state.loans.push({
+    id,
+    bookId,
+    userId,
+    status: "ACTIVE",
+    dueAt: new Date(Date.now() + 7 * DAY_MS),
+    returnedAt: null,
+  });
+}
+
+beforeEach(() => {
+  mocks.state.books.length = 0;
+  mocks.state.loans.length = 0;
+  mocks.revalidatePath.mockClear();
+});
+
+describe("borrowBook", () => {
+  it("creates an active loan due in 14 days", async () => {
+    addBook("book-1", 1);
+
+    const result = await borrowBook("book-1", "user-1");
+
+    expect(result).toEqual({ ok: true });
+    expect(mocks.state.loans).toHaveLength(1);
+    const loan = mocks.state.loans[0];
+    expect(loan.status).toBe("ACTIVE");
+    expect(loan.bookId).toBe("book-1");
+    expect(loan.userId).toBe("user-1");
+    const loanLength = loan.dueAt.getTime() - Date.now();
+    expect(loanLength).toBeGreaterThan(14 * DAY_MS - 5000);
+    expect(loanLength).toBeLessThanOrEqual(14 * DAY_MS);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/books");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/books/book-1");
+  });
+
+  it("rejects borrowing when no copies are available", async () => {
+    addBook("book-1", 1);
+    addActiveLoan("loan-1", "book-1", "user-2");
+
+    const result = await borrowBook("book-1", "user-1");
+
+    expect(result).toEqual({ ok: false, error: "No copies available" });
+    expect(mocks.state.loans).toHaveLength(1);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects borrowing the same book twice", async () => {
+    addBook("book-1", 3);
+    addActiveLoan("loan-1", "book-1", "user-1");
+
+    const result = await borrowBook("book-1", "user-1");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "You already have this book checked out",
+    });
+    expect(mocks.state.loans).toHaveLength(1);
+  });
+});
+
+describe("returnBook", () => {
+  it("marks the user's active loan as returned", async () => {
+    addBook("book-1", 1);
+    addActiveLoan("loan-1", "book-1", "user-1");
+
+    const result = await returnBook("loan-1", "user-1");
+
+    expect(result).toEqual({ ok: true });
+    const loan = mocks.state.loans[0];
+    expect(loan.status).toBe("RETURNED");
+    expect(loan.returnedAt).toBeInstanceOf(Date);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/books/book-1");
+  });
+
+  it("rejects returning someone else's loan", async () => {
+    addBook("book-1", 1);
+    addActiveLoan("loan-1", "book-1", "user-1");
+
+    const result = await returnBook("loan-1", "user-2");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "You can only return your own loans",
+    });
+    const loan = mocks.state.loans[0];
+    expect(loan.status).toBe("ACTIVE");
+    expect(loan.returnedAt).toBeNull();
+  });
+});
