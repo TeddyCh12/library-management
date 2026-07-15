@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +8,57 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Role {
+  MEMBER
+  LIBRARIAN
+}
+
+enum LoanStatus {
+  ACTIVE
+  RETURNED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  image     String?
+  role      Role     @default(MEMBER)
+  loans     Loan[]
+  createdAt DateTime @default(now())
+}
+
+model Book {
+  id            String   @id @default(cuid())
+  title         String
+  author        String
+  isbn          String?  @unique
+  genre         String?
+  publishedYear Int?
+  description   String?
+  coverUrl      String?
+  totalCopies   Int      @default(1)
+  loans         Loan[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([title])
+  @@index([author])
+}
+
+model Loan {
+  id         String     @id @default(cuid())
+  book       Book       @relation(fields: [bookId], references: [id])
+  bookId     String
+  user       User       @relation(fields: [userId], references: [id])
+  userId     String
+  status     LoanStatus @default(ACTIVE)
+  borrowedAt DateTime   @default(now())
+  dueAt      DateTime
+  returnedAt DateTime?
+
+  @@index([bookId, status])
+  @@index([userId, status])
 }
