@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { SearchXIcon } from "lucide-react";
+import Link from "next/link";
+import { PlusIcon, SearchXIcon } from "lucide-react";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { BookCard } from "@/components/books/book-card";
 import { BookFilters } from "@/components/books/book-filters";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Books",
@@ -70,11 +72,16 @@ export default async function BooksPage({
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
       <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">Books</h1>
-          <p className="text-sm text-muted-foreground">
-            {books.length} {books.length === 1 ? "book" : "books"}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-2xl font-semibold">Books</h1>
+            <p className="text-sm text-muted-foreground">
+              {books.length} {books.length === 1 ? "book" : "books"}
+            </p>
+          </div>
+          <Button render={<Link href="/books/new" />}>
+            <PlusIcon /> Add book
+          </Button>
         </div>
         <BookFilters genres={genres} />
         {books.length === 0 ? (
