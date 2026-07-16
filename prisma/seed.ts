@@ -252,6 +252,68 @@ async function main() {
     });
   }
   console.log(`Seeded ${demoUsers.length} demo users.`);
+
+  await seedDemoLoans();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysFromNow(days: number) {
+  return new Date(Date.now() + days * DAY_MS);
+}
+
+// Demo loans so the loans page and dashboard have data to show. Only created
+// when the demo member has no loans at all, so reruns stay idempotent.
+async function seedDemoLoans() {
+  const member = await prisma.user.findUniqueOrThrow({
+    where: { email: "demo.member@example.com" },
+  });
+
+  const existingLoans = await prisma.loan.count({
+    where: { userId: member.id },
+  });
+  if (existingLoans > 0) {
+    console.log("Demo member already has loans — skipping demo loans.");
+    return;
+  }
+
+  const dune = await prisma.book.findUniqueOrThrow({
+    where: { isbn: "9780441172719" },
+  });
+  const hobbit = await prisma.book.findUniqueOrThrow({
+    where: { isbn: "9780547928227" },
+  });
+  const nineteenEightyFour = await prisma.book.findUniqueOrThrow({
+    where: { isbn: "9780451524935" },
+  });
+
+  await prisma.loan.createMany({
+    data: [
+      {
+        bookId: dune.id,
+        userId: member.id,
+        status: "ACTIVE",
+        borrowedAt: daysFromNow(-20),
+        dueAt: daysFromNow(-6), // overdue by 6 days
+      },
+      {
+        bookId: hobbit.id,
+        userId: member.id,
+        status: "ACTIVE",
+        borrowedAt: daysFromNow(-3),
+        dueAt: daysFromNow(11),
+      },
+      {
+        bookId: nineteenEightyFour.id,
+        userId: member.id,
+        status: "RETURNED",
+        borrowedAt: daysFromNow(-30),
+        dueAt: daysFromNow(-16),
+        returnedAt: daysFromNow(-16),
+      },
+    ],
+  });
+  console.log("Seeded 3 demo loans.");
 }
 
 main()

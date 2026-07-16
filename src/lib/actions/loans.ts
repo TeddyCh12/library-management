@@ -88,9 +88,16 @@ export async function borrowBook(bookId: string): Promise<LoanActionResult> {
     throw error;
   }
 
+  revalidateLoanViews(bookId);
+  return { ok: true };
+}
+
+// Every view that shows loan or availability data.
+function revalidateLoanViews(bookId: string) {
   revalidatePath("/books");
   revalidatePath(`/books/${bookId}`);
-  return { ok: true };
+  revalidatePath("/loans");
+  revalidatePath("/dashboard");
 }
 
 export async function returnBook(loanId: string): Promise<LoanActionResult> {
@@ -131,7 +138,6 @@ export async function returnBook(loanId: string): Promise<LoanActionResult> {
     throw error;
   }
 
-  revalidatePath("/books");
-  revalidatePath(`/books/${bookId}`);
+  revalidateLoanViews(bookId);
   return { ok: true };
 }
