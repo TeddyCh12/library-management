@@ -73,18 +73,20 @@ model VerificationToken {
 }
 
 model Book {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   title         String
   author        String
-  isbn          String?  @unique
+  isbn          String?   @unique
   genre         String?
   publishedYear Int?
   description   String?
   coverUrl      String?
-  totalCopies   Int      @default(1)
+  totalCopies   Int       @default(1)
+  // Archived books stay out of the catalog but keep their loan history.
+  archivedAt    DateTime?
   loans         Loan[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([title])
   @@index([author])

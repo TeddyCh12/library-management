@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NewBookPage() {
-  // UX only — the proxy requires auth and createBook re-checks the role.
+  // UX only: the proxy requires auth and createBook re-checks the role.
   const session = await auth();
   if (session?.user?.role !== "LIBRARIAN") {
     redirect("/books");

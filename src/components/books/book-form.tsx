@@ -102,11 +102,11 @@ export function BookForm({
       });
       const result = await response.json();
       if (!response.ok || !result.ok) {
-        toast.error(result.error ?? "Couldn't fetch metadata — please fill manually.");
+        toast.error(result.error ?? "Couldn't fetch metadata. Please fill manually.");
         return;
       }
 
-      // Fill only fields the librarian has left empty — never overwrite.
+      // Fill only fields the librarian has left empty. Never overwrite.
       const data = result.data as BookMetadata & { title: string | null };
       let filledAnything = false;
       function fill(current: string, incoming: string | null) {
@@ -128,12 +128,12 @@ export function BookForm({
         description: fill(values.description, data.description),
       });
       if (filledAnything) {
-        toast.success("Fields filled — please review before saving");
+        toast.success("Fields filled. Please review before saving");
       } else {
-        toast.info("No metadata found — please fill manually");
+        toast.info("No metadata found. Please fill manually");
       }
     } catch {
-      toast.error("Couldn't fetch metadata — please fill manually.");
+      toast.error("Couldn't fetch metadata. Please fill manually.");
     } finally {
       setIsAutofilling(false);
     }
@@ -192,7 +192,7 @@ export function BookForm({
               <SparklesIcon /> {isAutofilling ? "Filling…" : "Autofill with AI"}
             </Button>
             <span className="text-xs text-muted-foreground">
-              Fills empty fields from the title or ISBN — review before saving.
+              Fills empty fields from the title or ISBN. Review before saving.
             </span>
           </div>
         )}

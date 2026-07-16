@@ -72,7 +72,7 @@ export function BorrowReturnPanel({
       {userLoan ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm">
-            Checked out — due{" "}
+            Checked out, due{" "}
             <span className="font-medium">
               {dateFormat.format(userLoan.dueAt)}
             </span>

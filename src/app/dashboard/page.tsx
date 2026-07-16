@@ -55,7 +55,11 @@ export default async function DashboardPage() {
     overdueLoans,
     recentBooks,
   ] = await Promise.all([
-    prisma.book.aggregate({ _sum: { totalCopies: true } }),
+    // Archived books are out of circulation, so they don't count.
+    prisma.book.aggregate({
+      _sum: { totalCopies: true },
+      where: { archivedAt: null },
+    }),
     prisma.loan.count({ where: { status: "ACTIVE" } }),
     prisma.loan.count({ where: { status: "ACTIVE", dueAt: { lt: now } } }),
     prisma.loan.findMany({
@@ -72,6 +76,7 @@ export default async function DashboardPage() {
       },
     }),
     prisma.book.findMany({
+      where: { archivedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, title: true, author: true, createdAt: true },
@@ -97,7 +102,7 @@ export default async function DashboardPage() {
           <h2 className="font-heading text-lg font-medium">Overdue loans</h2>
           {overdueLoans.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No overdue loans — everything is on time.
+              No overdue loans. Everything is on time.
             </p>
           ) : (
             <Table>

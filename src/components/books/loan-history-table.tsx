@@ -78,7 +78,7 @@ export function LoanHistoryTable({ loans }: { loans: LoanWithBorrower[] }) {
                 {dateFormat.format(loan.dueAt)}
               </TableCell>
               <TableCell>
-                {loan.returnedAt ? dateFormat.format(loan.returnedAt) : "—"}
+                {loan.returnedAt ? dateFormat.format(loan.returnedAt) : "–"}
               </TableCell>
               <TableCell>
                 <StatusBadge loan={loan} isOverdue={isOverdue} />

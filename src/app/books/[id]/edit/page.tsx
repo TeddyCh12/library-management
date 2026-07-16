@@ -15,7 +15,7 @@ export default async function EditBookPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // UX only — the proxy requires auth and updateBook re-checks the role.
+  // UX only: the proxy requires auth and updateBook re-checks the role.
   const session = await auth();
   if (session?.user?.role !== "LIBRARIAN") {
     redirect("/books");

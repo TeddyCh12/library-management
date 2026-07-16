@@ -49,7 +49,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Warm, bookish palette — paper light theme, deep brown-grey dark theme,
+/* Warm, bookish palette: paper light theme, deep brown-grey dark theme,
    muted forest-green accent. All pairs verified WCAG AA. */
 :root {
   --background: oklch(0.977 0.007 80.7); /* #faf7f2 warm paper */

@@ -51,6 +51,9 @@ export async function borrowBook(bookId: string): Promise<LoanActionResult> {
         if (!book) {
           throw new LoanError("Book not found");
         }
+        if (book.archivedAt) {
+          throw new LoanError("This book is archived");
+        }
 
         const activeLoans = await tx.loan.count({
           where: { bookId, status: "ACTIVE" },
@@ -80,10 +83,10 @@ export async function borrowBook(bookId: string): Promise<LoanActionResult> {
       return { ok: false, error: error.message };
     }
     if (isWriteConflict(error)) {
-      return { ok: false, error: "Someone else just borrowed this book — please try again" };
+      return { ok: false, error: "Someone else just borrowed this book. Please try again." };
     }
     if (isTransactionTimeout(error)) {
-      return { ok: false, error: "The system is busy — please try again." };
+      return { ok: false, error: "The system is busy. Please try again." };
     }
     throw error;
   }
@@ -133,7 +136,7 @@ export async function returnBook(loanId: string): Promise<LoanActionResult> {
       return { ok: false, error: error.message };
     }
     if (isWriteConflict(error) || isTransactionTimeout(error)) {
-      return { ok: false, error: "The system is busy — please try again." };
+      return { ok: false, error: "The system is busy. Please try again." };
     }
     throw error;
   }

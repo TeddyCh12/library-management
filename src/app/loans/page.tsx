@@ -101,7 +101,7 @@ export default async function LoansPage({
             <p>
               {isLibrarian && filter !== "all"
                 ? "No loans match this filter"
-                : "No loans yet — browse the catalog"}
+                : "No loans yet. Browse the catalog."}
             </p>
             <Button
               variant="outline"

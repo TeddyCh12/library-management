@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PlusIcon, SearchXIcon } from "lucide-react";
 
-import type { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
+import { buildBooksWhere, parseAvailability } from "@/lib/book-filters";
 import { prisma } from "@/lib/prisma";
 import { BookCard } from "@/components/books/book-card";
 import { BookFilters } from "@/components/books/book-filters";
@@ -22,23 +22,20 @@ export default async function BooksPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const session = await auth();
+  const isLibrarian = session?.user?.role === "LIBRARIAN";
+
   const params = await searchParams;
   const q = first(params.q)?.trim();
   const genre = first(params.genre);
-  const availability = first(params.availability);
+  const availability = parseAvailability(
+    first(params.availability),
+    isLibrarian,
+  );
 
-  const where: Prisma.BookWhereInput = {};
-  if (q) {
-    where.OR = [
-      { title: { contains: q, mode: "insensitive" } },
-      { author: { contains: q, mode: "insensitive" } },
-    ];
-  }
-  if (genre) {
-    where.genre = genre;
-  }
+  const where = buildBooksWhere(q, genre, availability);
 
-  const [rows, genreRows, session] = await Promise.all([
+  const [rows, genreRows] = await Promise.all([
     prisma.book.findMany({
       where,
       orderBy: { title: "asc" },
@@ -49,17 +46,17 @@ export default async function BooksPage({
       },
     }),
     prisma.book.findMany({
-      where: { genre: { not: null } },
+      where: { genre: { not: null }, archivedAt: null },
       select: { genre: true },
       distinct: ["genre"],
       orderBy: { genre: "asc" },
     }),
-    auth(),
   ]);
 
   let books = rows.map((book) => ({
     ...book,
     availableCopies: book.totalCopies - book._count.loans,
+    archived: book.archivedAt !== null,
   }));
   if (availability === "available") {
     books = books.filter((book) => book.availableCopies > 0);
@@ -81,13 +78,13 @@ export default async function BooksPage({
               {books.length} {books.length === 1 ? "book" : "books"}
             </p>
           </div>
-          {session?.user?.role === "LIBRARIAN" && (
+          {isLibrarian && (
             <Button nativeButton={false} render={<Link href="/books/new" />}>
               <PlusIcon /> Add book
             </Button>
           )}
         </div>
-        <BookFilters genres={genres} />
+        <BookFilters genres={genres} showArchived={isLibrarian} />
         {books.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-24 text-muted-foreground">
             <SearchXIcon className="size-8" aria-hidden />
@@ -104,7 +101,7 @@ export default async function BooksPage({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {books.map((book) => (
-              <BookCard key={book.id} book={book} />
+              <BookCard key={book.id} book={book} canRestore={isLibrarian} />
             ))}
           </div>
         )}

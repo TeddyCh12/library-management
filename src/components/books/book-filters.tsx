@@ -15,13 +15,19 @@ import {
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const availabilityItems = [
+const baseAvailabilityItems = [
   { label: "All books", value: "all" },
   { label: "Available now", value: "available" },
   { label: "All copies out", value: "out" },
 ];
 
-export function BookFilters({ genres }: { genres: string[] }) {
+export function BookFilters({
+  genres,
+  showArchived,
+}: {
+  genres: string[];
+  showArchived: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -41,6 +47,11 @@ export function BookFilters({ genres }: { genres: string[] }) {
     { label: "All genres", value: "all" },
     ...genres.map((genre) => ({ label: genre, value: genre })),
   ];
+
+  // The archive view is a librarian tool.
+  const availabilityItems = showArchived
+    ? [...baseAvailabilityItems, { label: "Archived", value: "archived" }]
+    : baseAvailabilityItems;
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams);

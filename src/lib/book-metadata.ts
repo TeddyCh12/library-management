@@ -28,7 +28,7 @@ function cleanText(value: string | null | undefined, maxLength: number) {
 }
 
 // Parses and sanity-checks raw model output. Returns null when the output
-// is not usable — the caller maps that to a friendly error.
+// is not usable; the caller maps that to a friendly error.
 export function parseBookMetadata(
   raw: string,
   currentYear = new Date().getFullYear(),

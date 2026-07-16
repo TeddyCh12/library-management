@@ -8,10 +8,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ArchiveBookButton } from "@/components/books/archive-book-button";
 import { BookCover } from "@/components/books/book-cover";
 import { BorrowReturnPanel } from "@/components/books/borrow-return-panel";
-import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { LoanHistoryTable } from "@/components/books/loan-history-table";
+import { RestoreBookButton } from "@/components/books/restore-book-button";
 
 // cache() dedupes the query between generateMetadata and the page render.
 const getBook = cache(async (id: string) => {
@@ -80,7 +81,9 @@ export default async function BookDetailPage({
 
           <div className="flex flex-wrap gap-1.5">
             {book.genre && <Badge variant="outline">{book.genre}</Badge>}
-            {isAvailable ? (
+            {book.archivedAt ? (
+              <Badge variant="secondary">Archived</Badge>
+            ) : isAvailable ? (
               <Badge className="bg-success/15 text-success">
                 {availableCopies} of {book.totalCopies} copies available
               </Badge>
@@ -112,14 +115,22 @@ export default async function BookDetailPage({
             </p>
           )}
 
-          <BorrowReturnPanel
-            bookId={book.id}
-            availableCopies={availableCopies}
-            userLoan={
-              userLoan ? { id: userLoan.id, dueAt: userLoan.dueAt } : null
-            }
-            isSignedIn={user !== null}
-          />
+          {book.archivedAt ? (
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted-foreground">
+                This book is archived and cannot be borrowed.
+              </p>
+            </div>
+          ) : (
+            <BorrowReturnPanel
+              bookId={book.id}
+              availableCopies={availableCopies}
+              userLoan={
+                userLoan ? { id: userLoan.id, dueAt: userLoan.dueAt } : null
+              }
+              isSignedIn={user !== null}
+            />
+          )}
 
           {user?.role === "LIBRARIAN" && (
             <div className="mt-auto flex flex-wrap gap-2 pt-2">
@@ -130,7 +141,11 @@ export default async function BookDetailPage({
               >
                 <PencilIcon /> Edit
               </Button>
-              <DeleteBookButton bookId={book.id} bookTitle={book.title} />
+              {book.archivedAt ? (
+                <RestoreBookButton bookId={book.id} size="default" />
+              ) : (
+                <ArchiveBookButton bookId={book.id} bookTitle={book.title} />
+              )}
             </div>
           )}
         </div>

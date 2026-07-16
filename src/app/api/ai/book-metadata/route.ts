@@ -4,7 +4,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { parseBookMetadata } from "@/lib/book-metadata";
 
-const FRIENDLY_ERROR = "Couldn't fetch metadata — please fill manually.";
+const FRIENDLY_ERROR = "Couldn't fetch metadata. Please fill manually.";
 
 const requestSchema = z
   .object({
@@ -17,7 +17,7 @@ const requestSchema = z
 
 const SYSTEM_PROMPT = [
   "You are a library cataloging assistant.",
-  "Given a book title (and possibly known facts about it), respond with ONLY a JSON object — no markdown, no code fences, no commentary — of exactly this shape:",
+  "Given a book title (and possibly known facts about it), respond with ONLY a JSON object (no markdown, no code fences, no commentary) of exactly this shape:",
   '{"author": string|null, "genre": string|null, "publishedYear": number|null, "description": string|null}',
   "description is a neutral summary of the book in at most 50 words.",
   "Use null for any field you are not sure about.",
@@ -86,7 +86,7 @@ function errorResponse(status: number, error: string) {
 }
 
 export async function POST(request: Request) {
-  // Same rule as createBook: only librarians may call this — it costs money.
+  // Same rule as createBook: only librarians may call this; it costs money.
   const session = await auth();
   if (session?.user?.role !== "LIBRARIAN") {
     return errorResponse(403, "Not authorized");
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       },
     });
   } catch {
-    // Network failure or the 10s timeout — never let this break the form.
+    // Network failure or the 10s timeout. Never let this break the form.
     return errorResponse(502, FRIENDLY_ERROR);
   }
 }

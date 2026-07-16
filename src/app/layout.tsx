@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     default: "Biblio",
     template: "%s · Biblio",
   },
-  description: "Biblio — Library Management",
+  description: "Biblio: Library Management",
 };
 
 export default function RootLayout({

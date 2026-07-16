@@ -13,9 +13,11 @@ export type BookFormState = {
   formError?: string;
 } | null;
 
-export type DeleteBookState = {
+export type ArchiveBookState = {
   error?: string;
 } | null;
+
+export type RestoreBookResult = { ok: true } | { ok: false; error: string };
 
 const currentYear = new Date().getFullYear();
 
@@ -38,7 +40,7 @@ const bookSchema = z.object({
     .min(1, "There must be at least 1 copy"),
 });
 
-// Empty inputs arrive as "" — store them as null rather than empty strings.
+// Empty inputs arrive as ""; store them as null rather than empty strings.
 function readField(formData: FormData, key: string): string | null {
   const value = formData.get(key);
   if (typeof value !== "string") {
@@ -68,6 +70,21 @@ function isUniqueConstraintError(error: unknown) {
   );
 }
 
+// Archived books keep their ISBN, so a conflict may come from the archive;
+// the hint tells the librarian to restore instead of re-adding.
+async function isbnConflictMessage(isbn: string | null): Promise<string> {
+  if (isbn) {
+    const existing = await prisma.book.findUnique({
+      where: { isbn },
+      select: { archivedAt: true },
+    });
+    if (existing?.archivedAt) {
+      return "A book with this ISBN exists in the archive";
+    }
+  }
+  return "A book with this ISBN already exists";
+}
+
 export async function createBook(
   _prevState: BookFormState,
   formData: FormData,
@@ -89,7 +106,7 @@ export async function createBook(
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return {
-        fieldErrors: { isbn: ["A book with this ISBN already exists"] },
+        fieldErrors: { isbn: [await isbnConflictMessage(parsed.data.isbn)] },
       };
     }
     throw error;
@@ -123,7 +140,7 @@ export async function updateBook(
     return {
       fieldErrors: {
         totalCopies: [
-          `Cannot set total copies below ${activeLoans} — ${activeLoans} ${copies} currently checked out`,
+          `Cannot set total copies below ${activeLoans}: ${activeLoans} ${copies} currently checked out`,
         ],
       },
     };
@@ -134,7 +151,7 @@ export async function updateBook(
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return {
-        fieldErrors: { isbn: ["A book with this ISBN already exists"] },
+        fieldErrors: { isbn: [await isbnConflictMessage(parsed.data.isbn)] },
       };
     }
     if (
@@ -151,10 +168,10 @@ export async function updateBook(
   redirect(`/books/${bookId}`);
 }
 
-export async function deleteBook(
-  _prevState: DeleteBookState,
+export async function archiveBook(
+  _prevState: ArchiveBookState,
   formData: FormData,
-): Promise<DeleteBookState> {
+): Promise<ArchiveBookState> {
   const session = await auth();
   if (session?.user?.role !== "LIBRARIAN") {
     return { error: "Not authorized" };
@@ -174,11 +191,11 @@ export async function deleteBook(
   }
 
   try {
-    // Returned-loan history belongs to the book, so it is deleted with it.
-    await prisma.$transaction([
-      prisma.loan.deleteMany({ where: { bookId } }),
-      prisma.book.delete({ where: { id: bookId } }),
-    ]);
+    // Loan history is preserved; the book just leaves the catalog.
+    await prisma.book.update({
+      where: { id: bookId },
+      data: { archivedAt: new Date() },
+    });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -190,5 +207,32 @@ export async function deleteBook(
   }
 
   revalidatePath("/books");
+  revalidatePath(`/books/${bookId}`);
   redirect("/books");
+}
+
+export async function restoreBook(bookId: string): Promise<RestoreBookResult> {
+  const session = await auth();
+  if (session?.user?.role !== "LIBRARIAN") {
+    return { ok: false, error: "Not authorized" };
+  }
+
+  try {
+    await prisma.book.update({
+      where: { id: bookId },
+      data: { archivedAt: null },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return { ok: false, error: "This book no longer exists" };
+    }
+    throw error;
+  }
+
+  revalidatePath("/books");
+  revalidatePath(`/books/${bookId}`);
+  return { ok: true };
 }

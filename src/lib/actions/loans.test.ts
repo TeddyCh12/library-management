@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // In-memory stand-ins for the tables the loan actions touch, so the
 // transaction logic can be tested without a database connection.
 const mocks = vi.hoisted(() => {
-  type BookRow = { id: string; totalCopies: number };
+  type BookRow = {
+    id: string;
+    totalCopies: number;
+    archivedAt: Date | null;
+  };
   type LoanRow = {
     id: string;
     bookId: string;
@@ -32,6 +36,20 @@ const mocks = vi.hoisted(() => {
     book: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         state.books.find((book) => book.id === where.id) ?? null,
+      update: async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: Partial<BookRow>;
+      }) => {
+        const book = state.books.find((row) => row.id === where.id);
+        if (!book) {
+          throw new Error("Record not found");
+        }
+        Object.assign(book, data);
+        return book;
+      },
     },
     loan: {
       count: async ({ where }: { where: Partial<LoanRow> }) =>
@@ -64,7 +82,9 @@ const mocks = vi.hoisted(() => {
     },
   };
 
+  // The actions use the same model methods directly and via $transaction.
   const prisma = {
+    ...tx,
     $transaction: async (
       fn: (tx: unknown) => Promise<unknown>,
       options?: unknown,
@@ -77,21 +97,22 @@ const mocks = vi.hoisted(() => {
     },
   };
 
-  return { state, prisma, revalidatePath: vi.fn() };
+  return { state, prisma, revalidatePath: vi.fn(), redirect: vi.fn() };
 });
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth", () => ({ auth: async () => mocks.state.session }));
 
 import { Prisma } from "@/generated/prisma/client";
-import { createBook } from "@/lib/actions/books";
+import { archiveBook, createBook, restoreBook } from "@/lib/actions/books";
 import { borrowBook, returnBook } from "@/lib/actions/loans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function addBook(id: string, totalCopies: number) {
-  mocks.state.books.push({ id, totalCopies });
+function addBook(id: string, totalCopies: number, archivedAt: Date | null = null) {
+  mocks.state.books.push({ id, totalCopies, archivedAt });
 }
 
 function addActiveLoan(id: string, bookId: string, userId: string) {
@@ -116,6 +137,7 @@ beforeEach(() => {
   mocks.state.transactionError = null;
   mocks.state.lastTransactionOptions = undefined;
   mocks.revalidatePath.mockClear();
+  mocks.redirect.mockClear();
 });
 
 const expectedTransactionOptions = {
@@ -153,6 +175,16 @@ describe("borrowBook", () => {
     const result = await borrowBook("book-1");
 
     expect(result).toEqual({ ok: false, error: "Not authorized" });
+    expect(mocks.state.loans).toHaveLength(0);
+  });
+
+  it("rejects borrowing an archived book", async () => {
+    addBook("book-1", 1, new Date());
+    signInAs("user-1", "MEMBER");
+
+    const result = await borrowBook("book-1");
+
+    expect(result).toEqual({ ok: false, error: "This book is archived" });
     expect(mocks.state.loans).toHaveLength(0);
   });
 
@@ -194,7 +226,7 @@ describe("borrowBook", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "The system is busy — please try again.",
+      error: "The system is busy. Please try again.",
     });
     expect(mocks.state.loans).toHaveLength(0);
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
@@ -259,7 +291,7 @@ describe("returnBook", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "The system is busy — please try again.",
+      error: "The system is busy. Please try again.",
     });
     expect(mocks.state.loans[0].status).toBe("ACTIVE");
   });
@@ -278,5 +310,75 @@ describe("createBook authorization", () => {
     const result = await createBook(null, new FormData());
 
     expect(result).toEqual({ formError: "Not authorized" });
+  });
+});
+
+function archiveForm(bookId: string) {
+  const fd = new FormData();
+  fd.set("bookId", bookId);
+  return fd;
+}
+
+describe("archiveBook", () => {
+  it("is blocked while copies are checked out", async () => {
+    addBook("book-1", 2);
+    addActiveLoan("loan-1", "book-1", "user-1");
+    signInAs("librarian-1", "LIBRARIAN");
+
+    const result = await archiveBook(null, archiveForm("book-1"));
+
+    expect(result).toEqual({ error: "1 copy is still checked out" });
+    expect(mocks.state.books[0].archivedAt).toBeNull();
+  });
+
+  it("archives and keeps loan history", async () => {
+    addBook("book-1", 1);
+    mocks.state.loans.push({
+      id: "loan-1",
+      bookId: "book-1",
+      userId: "user-1",
+      status: "RETURNED",
+      dueAt: new Date(),
+      returnedAt: new Date(),
+    });
+    signInAs("librarian-1", "LIBRARIAN");
+
+    await archiveBook(null, archiveForm("book-1"));
+
+    expect(mocks.state.books[0].archivedAt).toBeInstanceOf(Date);
+    expect(mocks.state.loans).toHaveLength(1);
+    expect(mocks.redirect).toHaveBeenCalledWith("/books");
+  });
+
+  it("rejects a member", async () => {
+    addBook("book-1", 1);
+    signInAs("user-1", "MEMBER");
+
+    const result = await archiveBook(null, archiveForm("book-1"));
+
+    expect(result).toEqual({ error: "Not authorized" });
+    expect(mocks.state.books[0].archivedAt).toBeNull();
+  });
+});
+
+describe("restoreBook", () => {
+  it("clears archivedAt for a librarian", async () => {
+    addBook("book-1", 1, new Date());
+    signInAs("librarian-1", "LIBRARIAN");
+
+    const result = await restoreBook("book-1");
+
+    expect(result).toEqual({ ok: true });
+    expect(mocks.state.books[0].archivedAt).toBeNull();
+  });
+
+  it("rejects a member", async () => {
+    addBook("book-1", 1, new Date());
+    signInAs("user-1", "MEMBER");
+
+    const result = await restoreBook("book-1");
+
+    expect(result).toEqual({ ok: false, error: "Not authorized" });
+    expect(mocks.state.books[0].archivedAt).toBeInstanceOf(Date);
   });
 });

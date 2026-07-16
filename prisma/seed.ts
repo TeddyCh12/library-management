@@ -36,7 +36,7 @@ const books: SeedBook[] = [
     genre: "Dystopian",
     publishedYear: 1949,
     description:
-      "Winston Smith rewrites history for the Ministry of Truth in a totalitarian state where Big Brother watches everything — until he dares to think for himself.",
+      "Winston Smith rewrites history for the Ministry of Truth in a totalitarian state where Big Brother watches everything, until he dares to think for himself.",
     totalCopies: 3,
   },
   {
@@ -121,7 +121,7 @@ const books: SeedBook[] = [
     genre: "Fantasy",
     publishedYear: 2007,
     description:
-      "Kvothe — magician, musician, and notorious legend — recounts how an orphaned trouper became the most infamous wizard his world has ever seen.",
+      "The magician, musician, and notorious legend Kvothe recounts how an orphaned trouper became the most infamous wizard his world has ever seen.",
   },
   {
     title: "Project Hail Mary",
@@ -130,7 +130,7 @@ const books: SeedBook[] = [
     genre: "Science Fiction",
     publishedYear: 2021,
     description:
-      "Ryland Grace wakes alone on a spaceship with no memory of who he is — and discovers he is humanity's last hope against an extinction-level threat.",
+      "Ryland Grace wakes alone on a spaceship with no memory of who he is, and discovers he is humanity's last hope against an extinction-level threat.",
     totalCopies: 2,
   },
   {
@@ -140,7 +140,7 @@ const books: SeedBook[] = [
     genre: "Memoir",
     publishedYear: 2018,
     description:
-      "Raised by survivalists in the Idaho mountains and kept out of school, Tara Westover fights her way to a PhD from Cambridge — at the cost of her family.",
+      "Raised by survivalists in the Idaho mountains and kept out of school, Tara Westover fights her way to a PhD from Cambridge, at the cost of her family.",
   },
   {
     title: "Sapiens: A Brief History of Humankind",
@@ -176,7 +176,7 @@ const books: SeedBook[] = [
     genre: "Fiction",
     publishedYear: 2020,
     description:
-      "Between life and death, Nora Seed finds a library of books containing every life she could have lived — and a chance to choose differently.",
+      "Between life and death, Nora Seed finds a library of books containing every life she could have lived, and a chance to choose differently.",
   },
   {
     title: "Klara and the Sun",
@@ -273,7 +273,7 @@ async function seedDemoLoans() {
     where: { userId: member.id },
   });
   if (existingLoans > 0) {
-    console.log("Demo member already has loans — skipping demo loans.");
+    console.log("Demo member already has loans, skipping demo loans.");
     return;
   }
 
