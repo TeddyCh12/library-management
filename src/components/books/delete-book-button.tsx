@@ -50,7 +50,7 @@ export function DeleteBookButton({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <form action={formAction}>
+          <form action={formAction} className="max-sm:w-full">
             <input type="hidden" name="bookId" value={bookId} />
             <AlertDialogAction
               type="submit"
