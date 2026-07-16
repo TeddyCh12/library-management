@@ -79,7 +79,7 @@ export default async function BooksPage({
               {books.length} {books.length === 1 ? "book" : "books"}
             </p>
           </div>
-          <Button render={<Link href="/books/new" />}>
+          <Button nativeButton={false} render={<Link href="/books/new" />}>
             <PlusIcon /> Add book
           </Button>
         </div>

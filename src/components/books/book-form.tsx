@@ -158,7 +158,11 @@ export function BookForm({
           <Button type="submit" disabled={isPending}>
             {isPending ? "Saving…" : submitLabel}
           </Button>
-          <Button variant="ghost" render={<Link href={cancelHref} />}>
+          <Button
+            variant="ghost"
+            nativeButton={false}
+            render={<Link href={cancelHref} />}
+          >
             Cancel
           </Button>
         </div>

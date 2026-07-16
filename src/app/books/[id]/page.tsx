@@ -132,6 +132,7 @@ export default async function BookDetailPage({
           <div className="mt-auto flex flex-wrap gap-2 pt-2">
             <Button
               variant="outline"
+              nativeButton={false}
               render={<Link href={`/books/${book.id}/edit`} />}
             >
               <PencilIcon /> Edit

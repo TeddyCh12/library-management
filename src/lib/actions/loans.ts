@@ -13,10 +13,26 @@ const LOAN_PERIOD_DAYS = 14;
 // roll the transaction back, then are mapped to a typed error result.
 class LoanError extends Error {}
 
+const transactionOptions = {
+  maxWait: 10000,
+  timeout: 15000,
+  // Serializable so two concurrent borrows cannot both pass the
+  // availability check and overdraw the copies.
+  isolationLevel: "Serializable",
+} as const;
+
 function isWriteConflict(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2034"
+  );
+}
+
+// P2028: the transaction could not be started or timed out.
+function isTransactionTimeout(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2028"
   );
 }
 
@@ -56,9 +72,7 @@ export async function borrowBook(
           data: { bookId, userId, status: "ACTIVE", dueAt },
         });
       },
-      // Serializable so two concurrent borrows cannot both pass the
-      // availability check and overdraw the copies.
-      { isolationLevel: "Serializable" },
+      transactionOptions,
     );
   } catch (error) {
     if (error instanceof LoanError) {
@@ -66,6 +80,9 @@ export async function borrowBook(
     }
     if (isWriteConflict(error)) {
       return { ok: false, error: "Someone else just borrowed this book — please try again" };
+    }
+    if (isTransactionTimeout(error)) {
+      return { ok: false, error: "The system is busy — please try again." };
     }
     throw error;
   }
@@ -102,10 +119,13 @@ export async function returnBook(
         data: { status: "RETURNED", returnedAt: new Date() },
       });
       return loan.bookId;
-    });
+    }, transactionOptions);
   } catch (error) {
     if (error instanceof LoanError) {
       return { ok: false, error: error.message };
+    }
+    if (isWriteConflict(error) || isTransactionTimeout(error)) {
+      return { ok: false, error: "The system is busy — please try again." };
     }
     throw error;
   }
