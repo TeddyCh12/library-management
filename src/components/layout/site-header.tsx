@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { HeaderNav } from "@/components/layout/header-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { signOutAction } from "@/lib/actions/auth";
 import { auth } from "@/lib/auth";
@@ -18,24 +19,10 @@ export async function SiteHeader() {
           <Link href="/books" className="font-heading text-xl font-semibold">
             Biblio
           </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            {user && (
-              <Link
-                href="/loans"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Loans
-              </Link>
-            )}
-            {user?.role === "LIBRARIAN" && (
-              <Link
-                href="/dashboard"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Dashboard
-              </Link>
-            )}
-          </nav>
+          <HeaderNav
+            showLoans={Boolean(user)}
+            showDashboard={user?.role === "LIBRARIAN"}
+          />
         </div>
         {user ? (
           <div className="flex items-center gap-3">
