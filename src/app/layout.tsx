@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,11 +32,13 @@ export const metadata: Metadata = {
   description: "Biblio: Library Management",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     // suppressHydrationWarning: next-themes sets the theme class on <html>
     // before hydration.
@@ -47,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           <SiteHeader />
           {children}
+          <AssistantWidget isSignedIn={Boolean(session?.user)} />
           <Toaster />
         </ThemeProvider>
       </body>
