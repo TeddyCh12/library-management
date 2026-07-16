@@ -40,6 +40,7 @@ export default async function EditBookPage({
           defaultValues={book}
           submitLabel="Save changes"
           cancelHref={`/books/${book.id}`}
+          showAutofill={session.user.role === "LIBRARIAN"}
         />
       </div>
     </main>

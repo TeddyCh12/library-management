@@ -24,6 +24,7 @@ export default async function NewBookPage() {
           action={createBook}
           submitLabel="Add book"
           cancelHref="/books"
+          showAutofill={session.user.role === "LIBRARIAN"}
         />
       </div>
     </main>
