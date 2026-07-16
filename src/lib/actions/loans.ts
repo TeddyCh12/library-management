@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { Prisma } from "@/generated/prisma/client";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type LoanActionResult = { ok: true } | { ok: false; error: string };
@@ -36,12 +37,12 @@ function isTransactionTimeout(error: unknown) {
   );
 }
 
-export async function borrowBook(
-  bookId: string,
-  userId: string,
-): Promise<LoanActionResult> {
-  // Auth comes later: userId will be read from the session instead of
-  // being passed in by the caller.
+export async function borrowBook(bookId: string): Promise<LoanActionResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, error: "Not authorized" };
+  }
+  const userId = session.user.id;
 
   try {
     await prisma.$transaction(
@@ -92,13 +93,12 @@ export async function borrowBook(
   return { ok: true };
 }
 
-export async function returnBook(
-  loanId: string,
-  userId: string,
-): Promise<LoanActionResult> {
-  // Auth comes later: userId will be read from the session instead of
-  // being passed in by the caller. Librarians will then also be allowed
-  // to return loans on behalf of members.
+export async function returnBook(loanId: string): Promise<LoanActionResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, error: "Not authorized" };
+  }
+  const { id: userId, role } = session.user;
 
   let bookId: string;
   try {
@@ -110,7 +110,8 @@ export async function returnBook(
       if (loan.status !== "ACTIVE") {
         throw new LoanError("This loan has already been returned");
       }
-      if (loan.userId !== userId) {
+      // Members may only return their own loans; librarians may return any.
+      if (loan.userId !== userId && role !== "LIBRARIAN") {
         throw new LoanError("You can only return your own loans");
       }
 

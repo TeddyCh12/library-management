@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Demo accounts
+
+Two seeded accounts are available for evaluation (password for both: `demo1234`):
+
+| Email                        | Role      |
+| ---------------------------- | --------- |
+| `demo.member@example.com`    | Member    |
+| `demo.librarian@example.com` | Librarian |
+
+Sign in at `/signin` with the "Demo account" form. Google SSO is also supported
+and its button appears automatically once `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` are set (see `.env.example`).
+
 ## Getting Started
 
 First, run the development server:

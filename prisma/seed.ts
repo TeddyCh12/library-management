@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 
 // Seeding is an admin operation, so it uses the direct (unpooled) connection,
@@ -241,11 +242,13 @@ async function main() {
   }
   console.log(`Seeded ${books.length} books.`);
 
+  // Hash the demo password at seed time; plaintext is never stored.
+  const passwordHash = await bcrypt.hash("demo1234", 10);
   for (const user of demoUsers) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {},
-      create: user,
+      update: { role: user.role, passwordHash },
+      create: { ...user, passwordHash },
     });
   }
   console.log(`Seeded ${demoUsers.length} demo users.`);

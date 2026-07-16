@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { updateBook } from "@/lib/actions/books";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { BookForm } from "@/components/books/book-form";
 
@@ -14,6 +15,12 @@ export default async function EditBookPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // UX only — the proxy requires auth and updateBook re-checks the role.
+  const session = await auth();
+  if (session?.user?.role !== "LIBRARIAN") {
+    redirect("/books");
+  }
+
   const { id } = await params;
   const book = await prisma.book.findUnique({ where: { id } });
   if (!book) {

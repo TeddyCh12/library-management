@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon, PencilIcon } from "lucide-react";
 
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,17 +12,6 @@ import { BookCover } from "@/components/books/book-cover";
 import { BorrowReturnPanel } from "@/components/books/borrow-return-panel";
 import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { LoanHistoryTable } from "@/components/books/loan-history-table";
-
-// Dev-only until auth: the seeded demo users power the acting-as picker.
-async function getDemoUsers() {
-  return prisma.user.findMany({
-    where: {
-      email: { in: ["demo.member@example.com", "demo.librarian@example.com"] },
-    },
-    select: { id: true, name: true, email: true },
-    orderBy: { email: "asc" },
-  });
-}
 
 // cache() dedupes the query between generateMetadata and the page render.
 const getBook = cache(async (id: string) => {
@@ -52,14 +42,18 @@ export default async function BookDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [book, demoUsers] = await Promise.all([getBook(id), getDemoUsers()]);
+  const [book, session] = await Promise.all([getBook(id), auth()]);
   if (!book) {
     notFound();
   }
 
+  const user = session?.user ?? null;
   const activeLoans = book.loans.filter((loan) => loan.status === "ACTIVE");
   const availableCopies = book.totalCopies - activeLoans.length;
   const isAvailable = availableCopies > 0;
+  const userLoan = user
+    ? (activeLoans.find((loan) => loan.userId === user.id) ?? null)
+    : null;
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
@@ -121,24 +115,24 @@ export default async function BookDetailPage({
           <BorrowReturnPanel
             bookId={book.id}
             availableCopies={availableCopies}
-            activeLoans={activeLoans.map((loan) => ({
-              id: loan.id,
-              userId: loan.userId,
-              dueAt: loan.dueAt,
-            }))}
-            users={demoUsers}
+            userLoan={
+              userLoan ? { id: userLoan.id, dueAt: userLoan.dueAt } : null
+            }
+            isSignedIn={user !== null}
           />
 
-          <div className="mt-auto flex flex-wrap gap-2 pt-2">
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={<Link href={`/books/${book.id}/edit`} />}
-            >
-              <PencilIcon /> Edit
-            </Button>
-            <DeleteBookButton bookId={book.id} bookTitle={book.title} />
-          </div>
+          {user?.role === "LIBRARIAN" && (
+            <div className="mt-auto flex flex-wrap gap-2 pt-2">
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href={`/books/${book.id}/edit`} />}
+              >
+                <PencilIcon /> Edit
+              </Button>
+              <DeleteBookButton bookId={book.id} bookTitle={book.title} />
+            </div>
+          )}
         </div>
       </div>
 

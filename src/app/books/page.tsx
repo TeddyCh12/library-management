@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PlusIcon, SearchXIcon } from "lucide-react";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { BookCard } from "@/components/books/book-card";
 import { BookFilters } from "@/components/books/book-filters";
@@ -37,7 +38,7 @@ export default async function BooksPage({
     where.genre = genre;
   }
 
-  const [rows, genreRows] = await Promise.all([
+  const [rows, genreRows, session] = await Promise.all([
     prisma.book.findMany({
       where,
       orderBy: { title: "asc" },
@@ -53,6 +54,7 @@ export default async function BooksPage({
       distinct: ["genre"],
       orderBy: { genre: "asc" },
     }),
+    auth(),
   ]);
 
   let books = rows.map((book) => ({
@@ -79,9 +81,11 @@ export default async function BooksPage({
               {books.length} {books.length === 1 ? "book" : "books"}
             </p>
           </div>
-          <Button nativeButton={false} render={<Link href="/books/new" />}>
-            <PlusIcon /> Add book
-          </Button>
+          {session?.user?.role === "LIBRARIAN" && (
+            <Button nativeButton={false} render={<Link href="/books/new" />}>
+              <PlusIcon /> Add book
+            </Button>
+          )}
         </div>
         <BookFilters genres={genres} />
         {books.length === 0 ? (

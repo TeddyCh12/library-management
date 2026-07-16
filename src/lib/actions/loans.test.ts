@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// In-memory stand-ins for the two tables the loan actions touch, so the
+// In-memory stand-ins for the tables the loan actions touch, so the
 // transaction logic can be tested without a database connection.
 const mocks = vi.hoisted(() => {
   type BookRow = { id: string; totalCopies: number };
@@ -12,10 +12,12 @@ const mocks = vi.hoisted(() => {
     dueAt: Date;
     returnedAt: Date | null;
   };
+  type SessionUser = { id: string; role: "MEMBER" | "LIBRARIAN" };
 
   const state = {
     books: [] as BookRow[],
     loans: [] as LoanRow[],
+    session: null as { user: SessionUser } | null,
     transactionError: null as Error | null,
     lastTransactionOptions: undefined as unknown,
   };
@@ -80,8 +82,10 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("@/lib/auth", () => ({ auth: async () => mocks.state.session }));
 
 import { Prisma } from "@/generated/prisma/client";
+import { createBook } from "@/lib/actions/books";
 import { borrowBook, returnBook } from "@/lib/actions/loans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -101,9 +105,14 @@ function addActiveLoan(id: string, bookId: string, userId: string) {
   });
 }
 
+function signInAs(id: string, role: "MEMBER" | "LIBRARIAN") {
+  mocks.state.session = { user: { id, role } };
+}
+
 beforeEach(() => {
   mocks.state.books.length = 0;
   mocks.state.loans.length = 0;
+  mocks.state.session = null;
   mocks.state.transactionError = null;
   mocks.state.lastTransactionOptions = undefined;
   mocks.revalidatePath.mockClear();
@@ -116,10 +125,11 @@ const expectedTransactionOptions = {
 };
 
 describe("borrowBook", () => {
-  it("creates an active loan due in 14 days", async () => {
+  it("creates an active loan due in 14 days for the session user", async () => {
     addBook("book-1", 1);
+    signInAs("user-1", "MEMBER");
 
-    const result = await borrowBook("book-1", "user-1");
+    const result = await borrowBook("book-1");
 
     expect(result).toEqual({ ok: true });
     expect(mocks.state.loans).toHaveLength(1);
@@ -137,28 +147,21 @@ describe("borrowBook", () => {
     );
   });
 
-  it("returns a friendly error when the transaction times out (P2028)", async () => {
+  it("rejects borrowing when signed out", async () => {
     addBook("book-1", 1);
-    mocks.state.transactionError = new Prisma.PrismaClientKnownRequestError(
-      "Transaction API error: unable to start a transaction",
-      { code: "P2028", clientVersion: "7.8.0" },
-    );
 
-    const result = await borrowBook("book-1", "user-1");
+    const result = await borrowBook("book-1");
 
-    expect(result).toEqual({
-      ok: false,
-      error: "The system is busy — please try again.",
-    });
+    expect(result).toEqual({ ok: false, error: "Not authorized" });
     expect(mocks.state.loans).toHaveLength(0);
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("rejects borrowing when no copies are available", async () => {
     addBook("book-1", 1);
     addActiveLoan("loan-1", "book-1", "user-2");
+    signInAs("user-1", "MEMBER");
 
-    const result = await borrowBook("book-1", "user-1");
+    const result = await borrowBook("book-1");
 
     expect(result).toEqual({ ok: false, error: "No copies available" });
     expect(mocks.state.loans).toHaveLength(1);
@@ -168,8 +171,9 @@ describe("borrowBook", () => {
   it("rejects borrowing the same book twice", async () => {
     addBook("book-1", 3);
     addActiveLoan("loan-1", "book-1", "user-1");
+    signInAs("user-1", "MEMBER");
 
-    const result = await borrowBook("book-1", "user-1");
+    const result = await borrowBook("book-1");
 
     expect(result).toEqual({
       ok: false,
@@ -177,14 +181,33 @@ describe("borrowBook", () => {
     });
     expect(mocks.state.loans).toHaveLength(1);
   });
+
+  it("returns a friendly error when the transaction times out (P2028)", async () => {
+    addBook("book-1", 1);
+    signInAs("user-1", "MEMBER");
+    mocks.state.transactionError = new Prisma.PrismaClientKnownRequestError(
+      "Transaction API error: unable to start a transaction",
+      { code: "P2028", clientVersion: "7.8.0" },
+    );
+
+    const result = await borrowBook("book-1");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "The system is busy — please try again.",
+    });
+    expect(mocks.state.loans).toHaveLength(0);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
 });
 
 describe("returnBook", () => {
-  it("marks the user's active loan as returned", async () => {
+  it("marks the user's own active loan as returned", async () => {
     addBook("book-1", 1);
     addActiveLoan("loan-1", "book-1", "user-1");
+    signInAs("user-1", "MEMBER");
 
-    const result = await returnBook("loan-1", "user-1");
+    const result = await returnBook("loan-1");
 
     expect(result).toEqual({ ok: true });
     const loan = mocks.state.loans[0];
@@ -196,28 +219,12 @@ describe("returnBook", () => {
     );
   });
 
-  it("returns a friendly error when the transaction times out (P2028)", async () => {
+  it("rejects a member returning someone else's loan", async () => {
     addBook("book-1", 1);
     addActiveLoan("loan-1", "book-1", "user-1");
-    mocks.state.transactionError = new Prisma.PrismaClientKnownRequestError(
-      "Transaction API error: unable to start a transaction",
-      { code: "P2028", clientVersion: "7.8.0" },
-    );
+    signInAs("user-2", "MEMBER");
 
-    const result = await returnBook("loan-1", "user-1");
-
-    expect(result).toEqual({
-      ok: false,
-      error: "The system is busy — please try again.",
-    });
-    expect(mocks.state.loans[0].status).toBe("ACTIVE");
-  });
-
-  it("rejects returning someone else's loan", async () => {
-    addBook("book-1", 1);
-    addActiveLoan("loan-1", "book-1", "user-1");
-
-    const result = await returnBook("loan-1", "user-2");
+    const result = await returnBook("loan-1");
 
     expect(result).toEqual({
       ok: false,
@@ -226,5 +233,50 @@ describe("returnBook", () => {
     const loan = mocks.state.loans[0];
     expect(loan.status).toBe("ACTIVE");
     expect(loan.returnedAt).toBeNull();
+  });
+
+  it("lets a librarian return someone else's loan", async () => {
+    addBook("book-1", 1);
+    addActiveLoan("loan-1", "book-1", "user-1");
+    signInAs("librarian-1", "LIBRARIAN");
+
+    const result = await returnBook("loan-1");
+
+    expect(result).toEqual({ ok: true });
+    expect(mocks.state.loans[0].status).toBe("RETURNED");
+  });
+
+  it("returns a friendly error when the transaction times out (P2028)", async () => {
+    addBook("book-1", 1);
+    addActiveLoan("loan-1", "book-1", "user-1");
+    signInAs("user-1", "MEMBER");
+    mocks.state.transactionError = new Prisma.PrismaClientKnownRequestError(
+      "Transaction API error: unable to start a transaction",
+      { code: "P2028", clientVersion: "7.8.0" },
+    );
+
+    const result = await returnBook("loan-1");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "The system is busy — please try again.",
+    });
+    expect(mocks.state.loans[0].status).toBe("ACTIVE");
+  });
+});
+
+describe("createBook authorization", () => {
+  it("rejects a signed-in member", async () => {
+    signInAs("user-1", "MEMBER");
+
+    const result = await createBook(null, new FormData());
+
+    expect(result).toEqual({ formError: "Not authorized" });
+  });
+
+  it("rejects a signed-out caller", async () => {
+    const result = await createBook(null, new FormData());
+
+    expect(result).toEqual({ formError: "Not authorized" });
   });
 });

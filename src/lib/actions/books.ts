@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { Prisma } from "@/generated/prisma/client";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type BookFormState = {
@@ -71,7 +72,10 @@ export async function createBook(
   _prevState: BookFormState,
   formData: FormData,
 ): Promise<BookFormState> {
-  // Auth check goes here in a later step (librarian role required).
+  const session = await auth();
+  if (session?.user?.role !== "LIBRARIAN") {
+    return { formError: "Not authorized" };
+  }
 
   const parsed = parseBookForm(formData);
   if (!parsed.success) {
@@ -101,7 +105,10 @@ export async function updateBook(
   _prevState: BookFormState,
   formData: FormData,
 ): Promise<BookFormState> {
-  // Auth check goes here in a later step (librarian role required).
+  const session = await auth();
+  if (session?.user?.role !== "LIBRARIAN") {
+    return { formError: "Not authorized" };
+  }
 
   const parsed = parseBookForm(formData);
   if (!parsed.success) {
@@ -148,7 +155,10 @@ export async function deleteBook(
   _prevState: DeleteBookState,
   formData: FormData,
 ): Promise<DeleteBookState> {
-  // Auth check goes here in a later step (librarian role required).
+  const session = await auth();
+  if (session?.user?.role !== "LIBRARIAN") {
+    return { error: "Not authorized" };
+  }
 
   const bookId = readField(formData, "bookId");
   if (!bookId) {
