@@ -89,9 +89,17 @@ export default async function BooksPage({
         </div>
         <BookFilters genres={genres} />
         {books.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-24 text-muted-foreground">
+          <div className="flex flex-col items-center gap-3 py-24 text-muted-foreground">
             <SearchXIcon className="size-8" aria-hidden />
             <p>No books match your search</p>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href="/books" />}
+            >
+              Clear search
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

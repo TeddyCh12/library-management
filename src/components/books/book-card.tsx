@@ -39,7 +39,7 @@ export function BookCard({ book }: BookCardProps) {
         <CardContent className="mt-auto flex flex-wrap gap-1.5">
           {book.genre && <Badge variant="outline">{book.genre}</Badge>}
           {isAvailable ? (
-            <Badge className="bg-emerald-600/15 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-400">
+            <Badge className="bg-success/15 text-success">
               {book.availableCopies} of {book.totalCopies} available
             </Badge>
           ) : (

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { SiteHeader } from "@/components/layout/site-header";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -15,12 +16,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Serif display face for page titles and the app name.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: {
-    default: "Library",
-    template: "%s · Library",
+    default: "Biblio",
+    template: "%s · Biblio",
   },
-  description: "Mini library management system",
+  description: "Biblio — Library Management",
 };
 
 export default function RootLayout({
@@ -29,14 +36,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: next-themes sets the theme class on <html>
+    // before hydration.
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SiteHeader />
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          <SiteHeader />
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

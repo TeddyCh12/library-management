@@ -81,7 +81,7 @@ export default async function BookDetailPage({
           <div className="flex flex-wrap gap-1.5">
             {book.genre && <Badge variant="outline">{book.genre}</Badge>}
             {isAvailable ? (
-              <Badge className="bg-emerald-600/15 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-400">
+              <Badge className="bg-success/15 text-success">
                 {availableCopies} of {book.totalCopies} copies available
               </Badge>
             ) : (
